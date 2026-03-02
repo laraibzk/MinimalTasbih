@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { RotateCcw, Minus, Settings2, ChevronDown, Check, X } from 'lucide-react';
+import { RotateCcw, Minus, Settings2, ChevronDown, Check, X, Vibrate, VibrateOff } from 'lucide-react';
 
 type ThemeKey = 'emerald' | 'pastel' | 'wood';
 
@@ -45,21 +45,23 @@ const loadState = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (!parsed.theme) parsed.theme = 'emerald';
+        if (parsed.hapticsEnabled === undefined) parsed.hapticsEnabled = true;
         return parsed;
       }
     } catch (e) {
       console.error("Failed to load state", e);
     }
   }
-  return { count: 0, target: 33, currentLap: 1, totalLaps: 1, theme: 'emerald' as ThemeKey };
+  return { count: 0, target: 33, currentLap: 1, totalLaps: 1, theme: 'emerald' as ThemeKey, hapticsEnabled: true };
 };
 
 export default function App() {
   const [state, setState] = useState(loadState);
   const [direction, setDirection] = useState(1);
   const [showSettings, setShowSettings] = useState(false);
+  const [isCustomTarget, setIsCustomTarget] = useState(state.target !== 33 && state.target !== 100);
 
-  const { count, target, currentLap, totalLaps, theme } = state;
+  const { count, target, currentLap, totalLaps, theme, hapticsEnabled } = state;
   const currentTheme = THEMES[theme as ThemeKey] || THEMES.emerald;
   
   // -1 represents Infinity (Infinite Laps) to be JSON serializable
@@ -76,6 +78,7 @@ export default function App() {
   }, [state]);
 
   const triggerHaptic = useCallback((pattern: number | number[]) => {
+    if (!hapticsEnabled) return;
     if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
       try {
         window.navigator.vibrate(pattern);
@@ -83,7 +86,7 @@ export default function App() {
         // Ignore haptic errors
       }
     }
-  }, []);
+  }, [hapticsEnabled]);
 
   const handleIncrease = useCallback((e?: React.MouseEvent | KeyboardEvent) => {
     if (e && 'stopPropagation' in e) e.stopPropagation();
@@ -94,19 +97,19 @@ export default function App() {
     if (count === target) {
       // We are at target, but not completed (so currentLap < totalLaps OR totalLaps === -1)
       updateState({ count: 1, currentLap: currentLap + 1 });
-      triggerHaptic(40);
+      triggerHaptic(15);
     } else {
       const next = count + 1;
       updateState({ count: next });
       
       if (next === target) {
         if (currentLap === totalLaps && !isInfinite) {
-          triggerHaptic([100, 200, 100, 200, 100]); // Final complete
+          triggerHaptic([50, 100, 50, 100, 50]); // Final complete
         } else {
-          triggerHaptic([50, 100, 50]); // Lap complete
+          triggerHaptic([30, 50, 30]); // Lap complete
         }
       } else {
-        triggerHaptic(40);
+        triggerHaptic(15);
       }
     }
   }, [count, target, currentLap, totalLaps, isCompleted, isInfinite, updateState, triggerHaptic]);
@@ -118,7 +121,7 @@ export default function App() {
     if (count > 0) {
       setDirection(-1);
       updateState({ count: count - 1 });
-      triggerHaptic(30);
+      triggerHaptic(10);
     }
   }, [count, isCompleted, updateState, triggerHaptic]);
 
@@ -126,7 +129,7 @@ export default function App() {
     e.stopPropagation();
     setDirection(-1);
     updateState({ count: 0, currentLap: 1 });
-    triggerHaptic([30, 50, 30]);
+    triggerHaptic([15, 30, 15]);
   }, [updateState, triggerHaptic]);
 
   // Keyboard support for accessibility
@@ -142,7 +145,7 @@ export default function App() {
         if (count > 0) {
           setDirection(-1);
           updateState({ count: count - 1 });
-          triggerHaptic(30);
+          triggerHaptic(10);
         }
       }
     };
@@ -342,6 +345,24 @@ export default function App() {
               </div>
               
               <div className="mb-6">
+                <label className="text-xs text-zinc-500 uppercase tracking-widest mb-3 block font-medium">Haptics</label>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => updateState({ hapticsEnabled: true })}
+                    className={`flex-1 py-3 rounded-xl border font-medium flex items-center justify-center gap-2 transition-colors ${hapticsEnabled ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-zinc-200'}`}
+                  >
+                    <Vibrate size={16} /> On
+                  </button>
+                  <button 
+                    onClick={() => updateState({ hapticsEnabled: false })}
+                    className={`flex-1 py-3 rounded-xl border font-medium flex items-center justify-center gap-2 transition-colors ${!hapticsEnabled ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-zinc-200'}`}
+                  >
+                    <VibrateOff size={16} /> Off
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-6">
                 <label className="text-xs text-zinc-500 uppercase tracking-widest mb-3 block font-medium">Theme</label>
                 <div className="grid grid-cols-3 gap-2">
                   {(Object.keys(THEMES) as ThemeKey[]).map(tKey => (
@@ -362,13 +383,43 @@ export default function App() {
                   {[33, 100].map(t => (
                     <button 
                       key={t}
-                      onClick={() => updateState({ target: t, count: 0, currentLap: 1 })}
-                      className={`flex-1 py-3 rounded-xl border font-medium transition-colors ${target === t ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-zinc-200'}`}
+                      onClick={() => {
+                        setIsCustomTarget(false);
+                        updateState({ target: t, count: 0, currentLap: 1 });
+                      }}
+                      className={`flex-1 py-3 rounded-xl border font-medium transition-colors ${target === t && !isCustomTarget ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-zinc-200'}`}
                     >
                       {t}
                     </button>
                   ))}
+                  <button 
+                    onClick={() => setIsCustomTarget(true)}
+                    className={`flex-1 py-3 rounded-xl border font-medium transition-colors ${isCustomTarget ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-zinc-200'}`}
+                  >
+                    Custom
+                  </button>
                 </div>
+                {isCustomTarget && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0, marginTop: 0 }} 
+                    animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+                    className="overflow-hidden"
+                  >
+                    <input
+                      type="number"
+                      min="1"
+                      value={target || ''}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        if (!isNaN(val) && val > 0) {
+                          updateState({ target: val, count: 0, currentLap: 1 });
+                        }
+                      }}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-zinc-600 transition-colors"
+                      placeholder="Enter custom amount"
+                    />
+                  </motion.div>
+                )}
               </div>
 
               <div className="mb-8">
