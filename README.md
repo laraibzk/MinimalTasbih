@@ -1,4 +1,4 @@
-##Minimal Tasbih - Beads counter
+# Minimal Tasbih - Beads counter
 
 # Run and deploy your AI Studio app
 
