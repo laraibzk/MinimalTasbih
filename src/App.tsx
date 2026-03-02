@@ -344,13 +344,14 @@ export default function App() {
               className="fixed inset-0 z-40 bg-black/60 backdrop-blur-md"
               onClick={(e) => { e.stopPropagation(); setShowSettings(false); }}
             />
-            <motion.div 
-              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed inset-x-0 bottom-0 z-50 bg-zinc-950 border-t border-zinc-900 rounded-t-[2rem] p-6 pb-12 max-h-[85vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="w-12 h-1.5 bg-zinc-800 rounded-full mx-auto mb-8" />
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center pointer-events-none sm:p-6">
+              <motion.div 
+                initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="w-full max-w-lg bg-zinc-950 border-t sm:border border-zinc-900 rounded-t-[2rem] sm:rounded-[2rem] p-6 pb-12 sm:pb-6 max-h-[85vh] overflow-y-auto pointer-events-auto shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-12 h-1.5 bg-zinc-800 rounded-full mx-auto mb-8 sm:hidden" />
               
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-light text-white tracking-tight">Settings</h2>
@@ -468,6 +469,7 @@ export default function App() {
                 </div>
               </div>
             </motion.div>
+            </div>
           </>
         )}
       </AnimatePresence>
