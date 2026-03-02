@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { RotateCcw, Minus, Settings2, ChevronDown, Check, X, Vibrate, VibrateOff } from 'lucide-react';
+import { RotateCcw, Minus, Settings, ChevronDown, Check, X, Vibrate, VibrateOff } from 'lucide-react';
 
 type ThemeKey = 'emerald' | 'pastel' | 'wood';
 
@@ -59,14 +59,15 @@ export default function App() {
   const [state, setState] = useState(loadState);
   const [direction, setDirection] = useState(1);
   const [showSettings, setShowSettings] = useState(false);
-  const [isCustomTarget, setIsCustomTarget] = useState(state.target !== 33 && state.target !== 100);
+  const [isCustomTarget, setIsCustomTarget] = useState(state.target !== 33 && state.target !== 100 && state.target !== -1);
 
   const { count, target, currentLap, totalLaps, theme, hapticsEnabled } = state;
   const currentTheme = THEMES[theme as ThemeKey] || THEMES.emerald;
   
   // -1 represents Infinity (Infinite Laps) to be JSON serializable
   const isInfinite = totalLaps === -1;
-  const isCompleted = count === target && currentLap === totalLaps && !isInfinite;
+  const isNoLimit = target === -1;
+  const isCompleted = !isNoLimit && count === target && currentLap === totalLaps && !isInfinite;
 
   const updateState = useCallback((updates: Partial<typeof state>) => {
     setState((prev: typeof state) => ({ ...prev, ...updates }));
@@ -93,6 +94,12 @@ export default function App() {
     if (isCompleted) return;
 
     setDirection(1);
+
+    if (isNoLimit) {
+      updateState({ count: count + 1 });
+      triggerHaptic(15);
+      return;
+    }
 
     if (count === target) {
       // We are at target, but not completed (so currentLap < totalLaps OR totalLaps === -1)
@@ -165,12 +172,10 @@ export default function App() {
         </div>
         <button 
           onClick={(e) => { e.stopPropagation(); setShowSettings(true); }}
-          className="flex items-center gap-2 bg-zinc-900/80 backdrop-blur-md hover:bg-zinc-800 px-4 py-2 rounded-full transition-colors border border-zinc-800"
+          className="w-10 h-10 flex items-center justify-center bg-zinc-900/80 backdrop-blur-md hover:bg-zinc-800 rounded-full transition-colors border border-zinc-800 text-zinc-400 hover:text-white"
+          aria-label="Settings"
         >
-          <Settings2 size={16} className={currentTheme.text} />
-          <span className="text-sm font-medium">
-            {target} / {isInfinite ? '∞' : `${totalLaps} Laps`}
-          </span>
+          <Settings size={18} />
         </button>
       </div>
 
@@ -294,11 +299,17 @@ export default function App() {
             {count}
           </motion.div>
           <div className="text-zinc-500 tracking-widest uppercase text-sm mt-3 font-medium flex items-center gap-2">
-            <span>Target: {target}</span>
-            <span className="w-1 h-1 rounded-full bg-zinc-700" />
-            <span className={count === target ? currentTheme.text : ''}>
-              {isInfinite ? `Lap ${currentLap}` : `Lap ${currentLap} of ${totalLaps}`}
-            </span>
+            {isNoLimit ? (
+              <span>No Limit</span>
+            ) : (
+              <>
+                <span>Target: {target}</span>
+                <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                <span className={count === target ? currentTheme.text : ''}>
+                  {isInfinite ? `Lap ${currentLap}` : `Lap ${currentLap} of ${totalLaps}`}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -327,127 +338,137 @@ export default function App() {
       {/* Settings Modal */}
       <AnimatePresence>
         {showSettings && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-            onClick={(e) => { e.stopPropagation(); setShowSettings(false); }}
-          >
+          <>
             <motion.div 
-              initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
-              className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 w-full max-w-sm"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-md"
+              onClick={(e) => { e.stopPropagation(); setShowSettings(false); }}
+            />
+            <motion.div 
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="fixed inset-x-0 bottom-0 z-50 bg-zinc-950 border-t border-zinc-900 rounded-t-[2rem] p-6 pb-12 max-h-[85vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-medium text-white">Settings</h2>
-                <button onClick={() => setShowSettings(false)} className="text-zinc-500 hover:text-white p-2">
-                  <X size={20} />
+              <div className="w-12 h-1.5 bg-zinc-800 rounded-full mx-auto mb-8" />
+              
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl font-light text-white tracking-tight">Settings</h2>
+                <button onClick={() => setShowSettings(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-900 text-zinc-400 hover:text-white transition-colors">
+                  <X size={16} />
                 </button>
               </div>
               
-              <div className="mb-6">
-                <label className="text-xs text-zinc-500 uppercase tracking-widest mb-3 block font-medium">Haptics</label>
-                <div className="flex gap-3">
-                  <button 
-                    onClick={() => updateState({ hapticsEnabled: true })}
-                    className={`flex-1 py-3 rounded-xl border font-medium flex items-center justify-center gap-2 transition-colors ${hapticsEnabled ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-zinc-200'}`}
-                  >
-                    <Vibrate size={16} /> On
-                  </button>
-                  <button 
-                    onClick={() => updateState({ hapticsEnabled: false })}
-                    className={`flex-1 py-3 rounded-xl border font-medium flex items-center justify-center gap-2 transition-colors ${!hapticsEnabled ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-zinc-200'}`}
-                  >
-                    <VibrateOff size={16} /> Off
-                  </button>
+              <div className="space-y-8">
+                <div>
+                  <label className="text-xs text-zinc-500 uppercase tracking-widest mb-3 block font-medium">Theme</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(Object.keys(THEMES) as ThemeKey[]).map(tKey => (
+                      <button 
+                        key={tKey}
+                        onClick={() => updateState({ theme: tKey })}
+                        className={`py-3 rounded-xl border font-medium transition-colors ${theme === tKey ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-900/50 border-zinc-800/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+                      >
+                        {THEMES[tKey].name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="mb-6">
-                <label className="text-xs text-zinc-500 uppercase tracking-widest mb-3 block font-medium">Theme</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(Object.keys(THEMES) as ThemeKey[]).map(tKey => (
+                <div>
+                  <label className="text-xs text-zinc-500 uppercase tracking-widest mb-3 block font-medium">Beads per Lap</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[33, 100].map(t => (
+                      <button 
+                        key={t}
+                        onClick={() => {
+                          setIsCustomTarget(false);
+                          updateState({ target: t, count: 0, currentLap: 1 });
+                        }}
+                        className={`py-3 rounded-xl border font-medium transition-colors ${target === t && !isCustomTarget ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-900/50 border-zinc-800/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+                      >
+                        {t}
+                      </button>
+                    ))}
                     <button 
-                      key={tKey}
-                      onClick={() => updateState({ theme: tKey })}
-                      className={`py-3 rounded-xl border font-medium transition-colors ${theme === tKey ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-zinc-200'}`}
+                      onClick={() => setIsCustomTarget(true)}
+                      className={`py-3 rounded-xl border font-medium transition-colors ${isCustomTarget && target !== -1 ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-900/50 border-zinc-800/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
                     >
-                      {THEMES[tKey].name}
+                      Custom
                     </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="text-xs text-zinc-500 uppercase tracking-widest mb-3 block font-medium">Beads per Lap</label>
-                <div className="flex gap-3">
-                  {[33, 100].map(t => (
                     <button 
-                      key={t}
                       onClick={() => {
                         setIsCustomTarget(false);
-                        updateState({ target: t, count: 0, currentLap: 1 });
+                        updateState({ target: -1, count: 0, currentLap: 1 });
                       }}
-                      className={`flex-1 py-3 rounded-xl border font-medium transition-colors ${target === t && !isCustomTarget ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-zinc-200'}`}
+                      className={`py-3 rounded-xl border font-medium transition-colors text-xs ${target === -1 ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-900/50 border-zinc-800/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
                     >
-                      {t}
+                      No Limit
                     </button>
-                  ))}
-                  <button 
-                    onClick={() => setIsCustomTarget(true)}
-                    className={`flex-1 py-3 rounded-xl border font-medium transition-colors ${isCustomTarget ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-zinc-200'}`}
-                  >
-                    Custom
-                  </button>
+                  </div>
+                  {isCustomTarget && target !== -1 && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0, marginTop: 0 }} 
+                      animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+                      className="overflow-hidden"
+                    >
+                      <input
+                        type="number"
+                        min="1"
+                        value={target || ''}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          if (!isNaN(val) && val > 0) {
+                            updateState({ target: val, count: 0, currentLap: 1 });
+                          }
+                        }}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-zinc-600 transition-colors"
+                        placeholder="Enter custom amount"
+                      />
+                    </motion.div>
+                  )}
                 </div>
-                {isCustomTarget && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0, marginTop: 0 }} 
-                    animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
-                    className="overflow-hidden"
-                  >
-                    <input
-                      type="number"
-                      min="1"
-                      value={target || ''}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value);
-                        if (!isNaN(val) && val > 0) {
-                          updateState({ target: val, count: 0, currentLap: 1 });
-                        }
-                      }}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-zinc-600 transition-colors"
-                      placeholder="Enter custom amount"
-                    />
+
+                {!isNoLimit && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <label className="text-xs text-zinc-500 uppercase tracking-widest mb-3 block font-medium">Number of Laps</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[1, 3, 7, '∞'].map(l => {
+                        const val = l === '∞' ? -1 : l;
+                        return (
+                          <button 
+                            key={l}
+                            onClick={() => updateState({ totalLaps: val, count: 0, currentLap: 1 })}
+                            className={`py-3 rounded-xl border font-medium transition-colors ${totalLaps === val ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-900/50 border-zinc-800/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+                          >
+                            {l}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </motion.div>
                 )}
-              </div>
 
-              <div className="mb-8">
-                <label className="text-xs text-zinc-500 uppercase tracking-widest mb-3 block font-medium">Number of Laps</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[1, 3, 7, '∞'].map(l => {
-                    const val = l === '∞' ? -1 : l;
-                    return (
-                      <button 
-                        key={l}
-                        onClick={() => updateState({ totalLaps: val, count: 0, currentLap: 1 })}
-                        className={`py-3 rounded-xl border font-medium transition-colors ${totalLaps === val ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-zinc-200'}`}
-                      >
-                        {l}
-                      </button>
-                    )
-                  })}
+                <div>
+                  <label className="text-xs text-zinc-500 uppercase tracking-widest mb-3 block font-medium">Haptics</label>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => updateState({ hapticsEnabled: true })}
+                      className={`flex-1 py-3 rounded-xl border font-medium flex items-center justify-center gap-2 transition-colors ${hapticsEnabled ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-900/50 border-zinc-800/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+                    >
+                      <Vibrate size={16} /> On
+                    </button>
+                    <button 
+                      onClick={() => updateState({ hapticsEnabled: false })}
+                      className={`flex-1 py-3 rounded-xl border font-medium flex items-center justify-center gap-2 transition-colors ${!hapticsEnabled ? `${currentTheme.lightBg} ${currentTheme.border} ${currentTheme.text}` : 'bg-zinc-900/50 border-zinc-800/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}
+                    >
+                      <VibrateOff size={16} /> Off
+                    </button>
+                  </div>
                 </div>
               </div>
-
-              <button 
-                onClick={() => setShowSettings(false)} 
-                className="w-full py-4 bg-white text-black rounded-xl font-medium hover:bg-zinc-200 transition-colors"
-              >
-                Done
-              </button>
             </motion.div>
-          </motion.div>
+          </>
         )}
       </AnimatePresence>
 
